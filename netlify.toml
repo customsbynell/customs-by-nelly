@@ -1,0 +1,8 @@
+# Netlify settings for Customs by Nelly
+[build]
+  publish = "public"
+  command = "echo 'No build step needed'"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

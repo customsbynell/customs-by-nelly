@@ -1,0 +1,9 @@
+{
+  "name": "customs-by-nelly",
+  "private": true,
+  "type": "module",
+  "description": "Customs by Nelly website with a built-in editor",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
