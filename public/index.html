@@ -1278,7 +1278,9 @@ document.addEventListener('click', e => {
   switch (t.dataset.action) {
     case 'close': if (d) d.close(); break;
     case 'cart': if (d) d.close(); if (cartStage === 'done') setCartStage('list'); openDialog('#cart'); break;
-    case 'checkout': setCartStage('checkout'); setTimeout(() => { const f = $('#orderForm input[name="name"]'); if (f) f.focus(); }, 60); break;
+    case 'checkout':
+  window.location.href = 'https://buy.stripe.com/6oU28I7Vc9Op0kfbrsbbG01';
+  break;
     case 'review': if (d) d.close(); resetReview(); openDialog('#reviewDialog'); break;
     case 'new-request': $('#commissionDone').hidden = true; $('#commissionForm').hidden = false; break;
     case 'prev': detailIdx = (detailIdx - 1 + C.artwork.length) % C.artwork.length; fillDetail(); break;
