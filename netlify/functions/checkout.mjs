@@ -18,7 +18,7 @@ export default async (req) => {
       mode: 'payment',
       line_items,
       shipping_address_collection: { allowed_countries: ['US'] },
-      shipping_options: [{ shipping_rate: 'shr_YOUR_SHIPPING_RATE_ID' }], // one flat $7 per order
+      shipping_options: [{ shipping_rate: 'shr_1UX62J9vUMYisRBucVV26wOU' }],
       success_url: `${origin}/?order=success`,
       cancel_url: `${origin}/`,
     });
