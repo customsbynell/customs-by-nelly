@@ -99,7 +99,7 @@ window.CONTENT = {
     { "id": "golden-hour", "title": "Golden Hour", "category": "Oil", "medium": "Oil on canvas", "size": "18 × 24 in", "year": "2026", "price": 480, "type": "original", "status": "available", "isNew": false, "inShop": true, "image": "", "description": "Warm light filtered through a quiet afternoon." },
     { "id": "layers", "title": "Layers", "category": "Mixed media", "medium": "Mixed media on panel", "size": "12 × 16 in", "year": "2025", "price": 320, "type": "original", "status": "available", "isNew": false, "inShop": true, "image": "", "description": "Texture and depth, built up session by session." },
     { "id": "green-light", "title": "Green Light", "category": "Acrylic", "medium": "Acrylic on canvas", "size": "20 × 20 in", "year": "2025", "price": 390, "type": "original", "status": "available", "isNew": false, "inShop": true, "image": "", "description": "Fresh greens and soft blush — a study in calm." },
-    { "id": "neon-bloom-print", "title": "Neon Bloom", "category": "Prints", "medium": "Archival giclée print · edition of 25", "size": "16 × 20 in", "year": "2026", "price": 180, "type": "print", "status": "available", "isNew": true, "inShop": true, "image": "", "description": "Signed and numbered archival print on cotton rag paper." },
+    { "id": "neon-bloom-print", "title": "Neon Bloom", "category": "Prints", "medium": "Archival giclée print · edition of 25", "size": "16 × 20 in", "year": "2026", "price": 180, "type": "print", "status": "available", "stripePrice": "", "isNew": true, "inShop": true, "image": "", "description": "Signed and numbered archival print on cotton rag paper." },
     { "id": "portrait-study", "title": "Portrait Study", "category": "Oil", "medium": "Oil on board", "size": "11 × 14 in", "year": "2025", "price": 420, "type": "original", "status": "sold", "isNew": false, "inShop": true, "image": "", "description": "A private portrait commission." },
     { "id": "chaos-and-calm", "title": "Chaos & Calm", "category": "Mixed media", "medium": "Mixed media on canvas", "size": "24 × 36 in", "year": "2025", "price": 820, "type": "original", "status": "available", "isNew": false, "inShop": false, "image": "", "description": "A large-scale piece. Get in touch for details." },
     { "id": "earth-tones", "title": "Earth Tones", "category": "Acrylic", "medium": "Acrylic on canvas", "size": "14 × 18 in", "year": "2024", "price": 280, "type": "original", "status": "sold", "isNew": false, "inShop": false, "image": "", "description": "A rich, earthy palette with a heavily textured surface." }
@@ -431,6 +431,10 @@ html:has(dialog[open]){overflow:hidden}
 .total{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
 .total span{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
 .total strong{font-family:var(--serif);font-weight:400;font-size:34px;line-height:1}
+.line-qty{display:inline-flex;align-items:center;gap:10px;margin-top:8px;font-family:var(--mono);font-size:13px}
+.line-qty button{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:transparent;color:inherit;font-size:15px;line-height:1;cursor:pointer}
+.line-qty button:disabled{opacity:.35;cursor:default}
+.sub-row{display:flex;justify-content:space-between;font-size:14px;color:var(--ink-3);margin-bottom:8px}
 .fine{font-size:12.5px;color:var(--ink-3);text-align:center;margin-top:12px;line-height:1.5}
 .cart-empty{display:grid;justify-items:center;gap:6px;text-align:center;padding:56px 8px}
 .cart-empty .big{font-family:var(--serif);font-size:30px;line-height:1.1}
@@ -875,10 +879,12 @@ html.js .reveal.in{opacity:1;transform:none}
       </div>
     </div>
     <footer class="drawer-foot" id="cartFoot">
+      <div class="sub-row"><span>Subtotal</span><span id="cartSub">$0</span></div>
+      <div class="sub-row"><span>Shipping (flat, once per order)</span><span id="cartShip">$7</span></div>
       <div class="total"><span>Total</span><strong id="cartTotal">$0</strong></div>
       <button class="btn btn-ink btn-block" data-action="checkout" id="checkoutBtn">Checkout</button>
       <button class="btn btn-ink btn-block" type="submit" form="orderForm" id="placeBtn" hidden>Send order request</button>
-      <p class="fine">No payment is taken yet. Nelly confirms availability, then emails a secure payment link.</p>
+      <p class="fine">Secure checkout by Stripe. Shipping is a flat $7 per order, no matter how many pieces you add.</p>
     </footer>
   </div>
 </dialog>
@@ -1129,21 +1135,28 @@ try { cart = JSON.parse(localStorage.getItem('cbn-cart') || '[]'); if (!Array.is
 const saveCart = () => { try { localStorage.setItem('cbn-cart', JSON.stringify(cart)); } catch (e) {} };
 const cartPieces = () => cart.map(id => C.artwork.find(a => a.id === id)).filter(a => a && canBuy(a));
 let cartStage = 'list';
+const SHIPPING_FEE = 7;   // keep in sync with the $7 shipping rate in Stripe
+let qtys = {};
+try { qtys = JSON.parse(localStorage.getItem('cbn-qty') || '{}') || {}; } catch (e) { qtys = {}; }
+const saveQty = () => { try { localStorage.setItem('cbn-qty', JSON.stringify(qtys)); } catch (e) {} };
+const qtyOf = a => a.type === 'print' ? Math.min(Math.max(parseInt(qtys[a.id]) || 1, 1), 10) : 1;
 
 function renderCart() {
   const items = cartPieces();
   cart = items.map(a => a.id);
-  const n = items.length, total = items.reduce((s, a) => s + Number(a.price || 0), 0);
+  const n = items.length, subtotal = items.reduce((s, a) => s + Number(a.price || 0) * qtyOf(a), 0), total = n ? subtotal + SHIPPING_FEE : 0;
   const cc = $('#cartCount'); cc.textContent = n; cc.hidden = !n;
+  $('#cartSub').textContent = money(subtotal) || '$0';
+  $('#cartShip').textContent = money(SHIPPING_FEE);
   $('#cartTotal').textContent = money(total) || '$0';
   $('#cartList').innerHTML = n ? items.map(a => `
     <div class="line">
       <span class="line-img">${art(a, C.artwork.indexOf(a))}</span>
-      <span class="line-info"><b>${esc(a.title)}</b><small>${esc(metaLine(a, ['medium', 'size']))}</small><span class="line-price">${money(a.price)}</span></span>
+      <span class="line-info"><b>${esc(a.title)}</b><small>${esc(metaLine(a, ['medium', 'size']))}</small><span class="line-price">${money(a.price)}</span>${a.type === 'print' ? `<span class="line-qty"><button data-qty="-1" data-id="${esc(a.id)}" aria-label="Fewer"${qtyOf(a) <= 1 ? ' disabled' : ''}>−</button><span>${qtyOf(a)}</span><button data-qty="1" data-id="${esc(a.id)}" aria-label="More">+</button></span>` : ''}</span>
       <button class="icon-btn sm" data-remove="${esc(a.id)}" aria-label="Remove ${esc(a.title)}">${icon('close')}</button>
     </div>`).join('')
     : `<div class="cart-empty"><p class="big">Your cart is empty</p><p>Find something you love in the shop.</p><a class="btn btn-glass" href="#shop" data-action="close">Browse the shop</a></div>`;
-  $('#orderItems').value = items.map(a => `${a.title} (${money(a.price)})`).join('; ');
+  $('#orderItems').value = items.map(a => `${a.title} x${qtyOf(a)} (${money(a.price)})`).join('; ');
   $('#orderTotal').value = money(total);
   if (!n && cartStage === 'checkout') cartStage = 'list';
   setCartStage(cartStage);
@@ -1162,6 +1175,7 @@ function addToCart(i) {
   const a = C.artwork[i];
   if (!a || !canBuy(a)) return;
   if (!cart.includes(a.id)) cart.push(a.id);
+  else if (a.type === 'print') { qtys[a.id] = Math.min(qtyOf(a) + 1, 10); saveQty(); }
   saveCart();
   if (cartStage === 'done') cartStage = 'list';
   renderCart(); renderShop();
@@ -1201,6 +1215,27 @@ function fillDetail() {
 }
 
 function resetReview() { $('#reviewForm').hidden = false; $('#reviewDone').hidden = true; }
+
+async function startCheckout(btn) {
+  const items = cartPieces();
+  if (!items.length) return;
+  const missing = items.filter(a => !a.stripePrice);
+  if (missing.length) { toast('Checkout isn’t set up for ' + missing[0].title + ' yet. Please email ' + (C.settings.email || 'Nelly') + '.'); return; }
+  const label = btn.innerHTML; btn.disabled = true; btn.textContent = 'Taking you to checkout…';
+  try {
+    const r = await fetch('/api/checkout', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ items: items.map(a => ({ price: a.stripePrice, quantity: qtyOf(a) })) }) });
+    const data = await r.json();
+    if (data.url) { window.location.href = data.url; return; }
+    throw new Error(data.error || 'no url');
+  } catch (err) { toast('Checkout didn’t start. Please try again in a moment.'); }
+  btn.disabled = false; btn.innerHTML = label;
+}
+if (new URLSearchParams(location.search).get('order') === 'success') {
+  cart = []; qtys = {}; saveCart(); saveQty();
+  history.replaceState(null, '', location.pathname + location.hash);
+  setTimeout(() => { renderCart(); renderShop(); toast('Thank you! Your order is in. A receipt is on its way to your email.'); }, 600);
+}
 
 /* ================================================================
    FORMS (Netlify Forms — they deliver once the site is live)
@@ -1259,6 +1294,9 @@ document.addEventListener('click', e => {
   if (ED.on && e.target.closest('[contenteditable]')) return;
   if (ED.on && e.target.closest('[data-photo]')) { openPanel('details'); return; }
 
+  const q = e.target.closest('[data-qty]');
+  if (q) { const a = C.artwork.find(x => x.id === q.dataset.id); if (a) { qtys[a.id] = Math.min(Math.max(qtyOf(a) + Number(q.dataset.qty), 1), 10); saveQty(); renderCart(); } return; }
+
   const t = e.target.closest('[data-open],[data-add],[data-remove],[data-action],[data-filter],[data-sfilter],[data-ed]');
   if (!t) return;
   const d = t.closest('dialog');
@@ -1278,9 +1316,7 @@ document.addEventListener('click', e => {
   switch (t.dataset.action) {
     case 'close': if (d) d.close(); break;
     case 'cart': if (d) d.close(); if (cartStage === 'done') setCartStage('list'); openDialog('#cart'); break;
-    case 'checkout':
-  window.location.href = 'https://buy.stripe.com/6oU28I7Vc9Op0kfbrsbbG01';
-  break;
+    case 'checkout': startCheckout(t); break;
     case 'review': if (d) d.close(); resetReview(); openDialog('#reviewDialog'); break;
     case 'new-request': $('#commissionDone').hidden = true; $('#commissionForm').hidden = false; break;
     case 'prev': detailIdx = (detailIdx - 1 + C.artwork.length) % C.artwork.length; fillDetail(); break;
@@ -1495,6 +1531,7 @@ function panelArtwork() {
         ${photoBlock(src, `data-upload="art" data-i="${i}"`, `data-ed="rm-photo" data-i="${i}"`)}
         ${fld('Title', 'title', a.title || '', i)}
         <div class="ed-2">${fld('Price ($)', 'price', a.price ?? '', i, { type: 'number', ph: '450' })}${sel('Status', 'status', a, i, [['available', 'Available'], ['sold', 'Sold']])}</div>
+        ${fld('Stripe price ID', 'stripePrice', a.stripePrice || '', i, { ph: 'price_1Abc…', hint: 'From Stripe → Product catalog. Needed for checkout.' })}
         ${fld('Description', 'description', a.description || '', i, { textarea: true, ph: 'A sentence or two about the piece' })}
         ${fld('Medium', 'medium', a.medium || '', i, { ph: 'Acrylic on canvas' })}
         <div class="ed-2">${fld('Size', 'size', a.size || '', i, { ph: '24 × 30 in' })}${fld('Year', 'year', a.year || '', i)}</div>
