@@ -1,17 +1,19 @@
 // GET  /api/content  → the published site content (or null if nothing published yet)
 // POST /api/content  → publish new content (admin password required)
 import { getStore } from "@netlify/blobs";
-import { isAdmin, json } from "../lib/auth.mjs";
+import { isAdmin, json, canPublish } from "../lib/auth.mjs";
 
-export default async (req) => {
+export default async (req, context) => {
   const store = getStore({ name: "site", consistency: "strong" });
 
   if (req.method === "GET") {
     const content = await store.get("content", { type: "json" });
-    return json({ backend: true, content: content || null });
+    return json({ backend: true, canPublish: canPublish(req, context), content: content || null });
   }
 
   if (req.method === "POST") {
+    // Safety: previews and branch deploys can never overwrite the live website's content.
+    if (!canPublish(req, context)) return json({ error: "Publishing is turned off on preview sites." }, 403);
     if (!isAdmin(req)) return json({ error: "Wrong password" }, 401);
     let body;
     try { body = await req.json(); } catch { return json({ error: "That wasn't valid site content." }, 400); }
