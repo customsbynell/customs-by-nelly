@@ -16,3 +16,16 @@ export const json = (data, status = 200) =>
     status,
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
+
+// Publishing is only allowed from the real, live site. Previews and branch deploys share the
+// same saved content as the live website, so they must never be able to write to it.
+export function deployContext(context) {
+  return String((context && context.deploy && context.deploy.context) || process.env.CONTEXT || "").toLowerCase();
+}
+export function canPublish(req, context) {
+  const ctx = deployContext(context);
+  if (ctx) return ctx === "production";
+  let host = "";
+  try { host = new URL(req.url).hostname.toLowerCase(); } catch { return false; }
+  return host === "customsbynelly.com" || host === "www.customsbynelly.com";
+}
